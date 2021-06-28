@@ -24,6 +24,7 @@ extension YPLibraryVC: PHPhotoLibraryChangeObserver {
                 if !collectionChanges!.hasIncrementalChanges || collectionChanges!.hasMoves {
                     collectionView.reloadData()
                 } else {
+                    let selection = self.selection
                     collectionView.performBatchUpdates({
                         let removedIndexes = collectionChanges!.removedIndexes
                         if (removedIndexes?.count ?? 0) != 0 {
@@ -33,11 +34,23 @@ extension YPLibraryVC: PHPhotoLibraryChangeObserver {
                         if (insertedIndexes?.count ?? 0) != 0 {
                             collectionView.insertItems(at: insertedIndexes!.aapl_indexPathsFromIndexesWithSection(0))
                         }
-                    }, completion: { finished in
+                    }, completion: { [weak self] finished in
                         if finished {
                             let changedIndexes = collectionChanges!.changedIndexes
                             if (changedIndexes?.count ?? 0) != 0 {
                                 collectionView.reloadItems(at: changedIndexes!.aapl_indexPathsFromIndexesWithSection(0))
+                            }
+                            
+                            //reset index to 0 when selected item changed to fix can't fetch asset from photo library
+                            guard let `self` = self, !self.multipleSelectionEnabled else { return }
+                            let removedIndexItems = collectionChanges?.removedIndexes?.aapl_indexPathsFromIndexesWithSection(0).map({ $0.item }) ?? []
+                            let changedIndexItems = collectionChanges?.changedIndexes?.aapl_indexPathsFromIndexesWithSection(0).map({ $0.item }) ?? []
+                            let allItems = removedIndexItems + changedIndexItems
+                            let selectionIndexes = selection.map { $0.index }
+                            if selectionIndexes.contains(where: { allItems.contains($0)}) {
+                                self.currentlySelectedIndex = 0
+                                self.selection.removeAll()
+                                self.refreshMediaRequest()
                             }
                         }
                     })
